@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Mic, MicOff, Copy, Download, Mail, Sparkles, Volume2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
@@ -12,6 +12,12 @@ import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
 
 export default function EmailAssistant() {
+  const speechLang = {
+    english: "en-US",
+    hindi: "hi-IN",
+    marathi: "mr-IN"
+  }
+  
   const [inputText, setInputText] = useState("")
   const [convertedEmail, setConvertedEmail] = useState("")
   const [isRecording, setIsRecording] = useState(false)
@@ -19,6 +25,39 @@ export default function EmailAssistant() {
   const [autoGreeting, setAutoGreeting] = useState(true)
   const [selectedLanguage, setSelectedLanguage] = useState("english")
   const [isConverting, setIsConverting] = useState(false)
+  const recognitionRef = useRef<any>(null);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const SpeechRecognition =
+        (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+
+      if (!SpeechRecognition) {
+        alert('Speech Recognition not supported in this browser');
+        return;
+      }
+
+      const recognition = new SpeechRecognition();
+      recognition.lang = speechLang[selectedLanguage as keyof typeof speechLang];
+      console.log(speechLang[selectedLanguage as keyof typeof speechLang])
+      recognition.interimResults = false;
+      recognition.maxAlternatives = 1;
+
+      recognition.onresult = (event: any) => {
+        const speech = event.results[0][0].transcript;
+        console.log("speech", speech)
+        setInputText(prev => prev + " " + speech);
+      };
+
+      recognition.onerror = (event: any) => {
+        console.error('Speech recognition error', event.error);
+      };
+
+      recognitionRef.current = recognition;
+    }
+  }, [
+    selectedLanguage
+  ]);
 
   const handleConvertToEmail = async () => {
     console.log("Converting to email:", inputText)
@@ -51,16 +90,12 @@ export default function EmailAssistant() {
   }
 
   const handleMicClick = () => {
-    setIsRecording(!isRecording)
-
-    if (!isRecording) {
-      // Simulate speech recognition
-      setTimeout(() => {
-        setInputText(
-          (prev) => prev + (prev ? " " : "") + "This is a sample voice input that would be transcribed from speech.",
-        )
-        setIsRecording(false)
-      }, 3000)
+    if (isRecording) {
+      recognitionRef.current.stop();
+      setIsRecording(false);
+    } else {
+      recognitionRef.current.start();
+      setIsRecording(true);
     }
   }
 
@@ -84,7 +119,7 @@ export default function EmailAssistant() {
   }
 
   const characterCount = inputText.length
-  const maxCharacters = 1000
+  const maxCharacters = 50000
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
